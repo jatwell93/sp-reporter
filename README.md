@@ -25,6 +25,16 @@ A plugin for [Super Productivity](https://super-productivity.com) that generates
 - 📝 Optional inclusion of task notes in reports
 - 🔄 Reports are synced across devices using Super Productivity's persistence API
 
+### New Current Tasks Export Feature
+
+- 📋 **Generate Current Tasks Reports** - Export all active (non-completed) tasks with full details
+- 🏷️ **Filter by Tags** - Filter current tasks by specific tags
+- 📅 **Filter by Due Date Range** - Show tasks due within a specific date range
+- 📝 **Comprehensive Task Details** - Includes titles, projects, due dates, tags, time estimates, notes, and subtasks
+- 🎛️ **Customizable Display** - Control what information is shown in current tasks reports
+- 💾 **Save Current Tasks Reports** - Save current tasks reports for future reference
+- 📊 **Distinguished Report Types** - Current tasks reports are clearly marked with 📋 icon
+
 ## Installation
 
 1. Download the plugin files for the latest [Release](https://github.com/dougcooper/sp-reporter/releases)
@@ -61,6 +71,30 @@ A plugin for [Super Productivity](https://super-productivity.com) that generates
    - Delete individual reports with the 🗑️ button
    - Select multiple reports and delete them all at once
    - Select multiple reports and combine them into a single document with the 🔗 button
+
+### Current Tasks Report Usage
+
+1. Click the "📋 Current Tasks" button in the header
+2. **Set your filter criteria**:
+  - **Due Date Range**: Select start and end dates to filter tasks by their due dates
+  - **Filter by Tags**: Check this option to enable tag filtering
+  - **Select Tags**: Choose specific tags to filter tasks (only shown when tag filtering is enabled)
+3. Click "Generate Current Tasks Report"
+4. The current tasks report will appear in a modal showing:
+  - All active (non-completed) tasks
+  - Tasks grouped by due date, with a "No Due Date" section for tasks without due dates
+  - Comprehensive task details including:
+    - Task titles
+    - Project names (when enabled in preferences)
+    - Due dates (when available and enabled)
+    - Tags (when available and enabled)
+    - Time estimates (when available and enabled)
+    - Notes/descriptions (when available and enabled)
+    - Subtasks (when available and enabled)
+5. **Customize the report display** by adjusting preferences in the ⚙️ settings menu
+6. **Copy to Clipboard** to paste the current tasks report anywhere
+7. **Save the report** with a custom name for future reference
+8. Current tasks reports are saved with a 📋 icon and labeled as "Current Tasks" in the saved reports list
 
 ## Report Format
 
@@ -138,7 +172,70 @@ The generated report is formatted in Markdown and includes:
 ```
 
 The Markdown format makes it easy to paste into documentation, notes, or any Markdown-compatible application.
+
+### Current Tasks Report Example
+
+```markdown
+# Current Tasks Report
+
+**Generated:** 12/10/2025, 2:12:18 PM
+**Total Current Tasks:** 6
+**Due Date Range:** Wednesday, December 10, 2025 - Tuesday, December 16, 2025
+
+---
+
+## Wednesday, December 10, 2025
+
+- **Complete plugin implementation**
+  *Project:* SP Reporter
+  *Due:* Wednesday, December 10, 2025
+  *Tags:* development, urgent
+  *Estimate:* 2h
+  *Notes:*
+    Need to implement the current tasks export feature
+    with all the specified requirements
+
+  *Subtasks:*
+    - Subtask 123
+    - Subtask 456
+
+- **Review pull requests**
+  *Project:* SP Reporter
+  *Due:* Wednesday, December 10, 2025
+  *Tags:* code-review
+  *Estimate:* 1h
+
+## Thursday, December 11, 2025
+
+- **Test new functionality**
+  *Project:* SP Reporter
+  *Due:* Thursday, December 11, 2025
+  *Tags:* testing, qa
+
+## No Due Date
+
+- **Document new features**
+  *Project:* SP Reporter
+  *Tags:* documentation
+  *Notes:*
+    Update README with new functionality
+    Add usage examples
+
+- **Plan next sprint**
+  *Project:* SP Reporter
+  *Tags:* planning
 ```
+
+### Current Tasks Preferences
+
+The current tasks report display can be customized in the preferences menu (⚙️):
+
+- **Show project name**: Display the project each task belongs to
+- **Show due dates**: Include due date information for tasks
+- **Show tags**: Display tags associated with each task
+- **Show time estimates**: Include time estimate information
+- **Show notes**: Display task notes and descriptions
+- **Show subtasks**: Include subtask information for each task
 
 ## Combining Reports
 
@@ -292,7 +389,7 @@ gh release upload v1.0.0 date-range-reporter.zip --clobber
 
 ## Version
 
-1.5.0
+2.0.0
 
 ## Author
 

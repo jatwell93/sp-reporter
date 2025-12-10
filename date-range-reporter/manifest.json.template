@@ -12,6 +12,7 @@
   "permissions": [
     "getTasks",
     "getArchivedTasks",
+    "getAllTags",
     "showSnack",
     "persistDataSynced",
     "loadSyncedData"

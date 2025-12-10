@@ -546,6 +546,12 @@
         margin-bottom: 0;
       }
 
+      .header-container .button-group {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
       .settings-btn {
         background: none;
         border: none;
@@ -570,7 +576,10 @@
     <div class="container">
       <div class="header-container">
         <h1>📊 Date Range Task Reporter</h1>
-        <button class="settings-btn" id="settingsBtn" title="Filter Settings">⚙️</button>
+        <div class="button-group">
+          <button class="settings-btn" id="settingsBtn" title="Filter Settings">⚙️</button>
+          <button id="generateCurrentTasksBtn" class="secondary-btn" title="Current Tasks Report">📋 Current Tasks</button>
+        </div>
       </div>
 
       <div class="info">
@@ -674,7 +683,53 @@
         </div>
       </div>
     </div>
-
+  
+    <!-- Current Tasks Modal -->
+    <div class="modal-overlay" id="currentTasksModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">📋 Current Tasks Report</h3>
+          <button class="modal-close" id="closeCurrentTasksModalBtn">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="input-section">
+            <div class="input-group">
+              <div class="input-field">
+                <label for="currentTasksStartDate">Due Date Start</label>
+                <input type="date" id="currentTasksStartDate" />
+              </div>
+              <div class="input-field">
+                <label for="currentTasksEndDate">Due Date End</label>
+                <input type="date" id="currentTasksEndDate" />
+              </div>
+            </div>
+            <div class="input-field" style="margin-top: 16px;">
+              <label for="sortBy">Sort by</label>
+              <select id="sortBy" style="width: 200px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-secondary); color: var(--text-primary);">
+                <option value="dueDate">Due Date</option>
+                <option value="project">Project</option>
+                <option value="tag">Tag</option>
+              </select>
+            </div>
+            <div class="checkbox-field" style="margin-top: 16px;">
+              <input type="checkbox" id="filterByTags" />
+              <label for="filterByTags">Filter by Tags</label>
+            </div>
+            <div id="tagsFilterSection" style="display: none; margin-top: 12px;">
+              <label>Select Tags to Filter:</label>
+              <div id="tagsCheckboxContainer" style="margin-top: 8px; max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: 8px; border-radius: 4px;"></div>
+            </div>
+            <button id="generateCurrentTasksReportBtn" style="margin-top: 16px;">Generate Current Tasks Report</button>
+          </div>
+          <textarea class="modal-report-content" id="currentTasksReportContent" placeholder="Current tasks report will appear here..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button id="currentTasksCopyBtn" class="secondary-btn">📋 Copy to Clipboard</button>
+          <button id="currentTasksSaveBtn">💾 Save Report</button>
+        </div>
+      </div>
+    </div>
+  
     <script>
       // Theme detection and management
       function detectTheme() {
@@ -747,14 +802,29 @@
       const modalCopyBtn = document.getElementById('modalCopyBtn');
       const modalSaveBtn = document.getElementById('modalSaveBtn');
       const reportNameInput = document.getElementById('reportNameInput');
-      
+
+      // Current tasks modal elements
+      const currentTasksModal = document.getElementById('currentTasksModal');
+      const closeCurrentTasksModalBtn = document.getElementById('closeCurrentTasksModalBtn');
+      const currentTasksStartDate = document.getElementById('currentTasksStartDate');
+      const currentTasksEndDate = document.getElementById('currentTasksEndDate');
+      const filterByTagsCheckbox = document.getElementById('filterByTags');
+      const tagsFilterSection = document.getElementById('tagsFilterSection');
+      const tagsCheckboxContainer = document.getElementById('tagsCheckboxContainer');
+      const generateCurrentTasksReportBtn = document.getElementById('generateCurrentTasksReportBtn');
+      const currentTasksReportContent = document.getElementById('currentTasksReportContent');
+      const currentTasksCopyBtn = document.getElementById('currentTasksCopyBtn');
+      const currentTasksSaveBtn = document.getElementById('currentTasksSaveBtn');
+      const generateCurrentTasksBtn = document.getElementById('generateCurrentTasksBtn');
+      const sortBySelect = document.getElementById('sortBy');
+
       // Preferences modal elements
       const preferencesModal = document.getElementById('preferencesModal');
       const closePreferencesBtn = document.getElementById('closePreferencesBtn');
       const cancelPreferencesBtn = document.getElementById('cancelPreferencesBtn');
       const savePreferencesBtn = document.getElementById('savePreferencesBtn');
       const settingsBtn = document.getElementById('settingsBtn');
-      
+
       // Saved reports elements
       const savedReportsSection = document.getElementById('savedReportsSection');
       const savedReportsList = document.getElementById('savedReportsList');
@@ -773,7 +843,14 @@
         includeNotes: false,
         minTimeSpent: 5,
         showTimeSpent: true,
-        showTotalTime: true
+        showTotalTime: true,
+        // Current tasks preferences
+        currentTasksShowProject: true,
+        currentTasksShowDueDate: true,
+        currentTasksShowTags: true,
+        currentTasksShowEstimate: true,
+        currentTasksShowNotes: true,
+        currentTasksShowSubtasks: true
       };
 
       // Set default dates to past seven days (including today)
@@ -1111,6 +1188,265 @@
         return { reportText, totalTasks };
       }
 
+      // Fetch current tasks data
+      async function fetchCurrentTasksData() {
+        try {
+          // Get all active tasks (non-completed)
+          const allTasks = await PluginAPI.getTasks();
+          
+          // Create a map of all tasks by ID for subtask lookup
+          const tasksMap = {};
+          allTasks.forEach(task => {
+            tasksMap[task.id] = task;
+          });
+          
+          // Create a set of all subtask IDs to filter them out from main list
+          const subtaskIds = new Set();
+          allTasks.forEach(task => {
+            if (task.subTaskIds && task.subTaskIds.length > 0) {
+              task.subTaskIds.forEach(subId => subtaskIds.add(subId));
+            }
+          });
+          
+          // Filter to get only non-completed tasks that are NOT subtasks
+          const currentTasks = allTasks.filter(task => !task.isDone && !subtaskIds.has(task.id));
+
+          // Get all tags for tag name resolution
+          const allTags = await PluginAPI.getAllTags();
+          const tagsMap = {};
+          allTags.forEach(tag => {
+            tagsMap[tag.id] = tag.title;
+          });
+
+          // Get all projects for project name resolution
+          const allProjects = await PluginAPI.getAllProjects();
+          const projectsMap = {};
+          allProjects.forEach(project => {
+            projectsMap[project.id] = project.title;
+          });
+
+          return {
+            currentTasks,
+            tagsMap,
+            projectsMap,
+            allTags,
+            tasksMap
+          };
+        } catch (error) {
+          console.error('Error fetching current tasks data:', error);
+          throw error;
+        }
+      }
+
+      // Generate current tasks report
+      function generateCurrentTasksReport(currentTasks, tagsMap, projectsMap, startDate, endDate, selectedTagIds, tasksMap, sortBy = 'dueDate') {
+        // Filter tasks by due date range if dates are provided
+        let filteredTasks = [...currentTasks];
+
+        if (startDate && endDate) {
+          filteredTasks = filteredTasks.filter(task => {
+            // If task has no due date, include it when filtering by date range
+            // (user might want to see tasks without due dates too)
+            if (!task.dueOn) return true;
+            const taskDate = new Date(task.dueOn);
+            const taskDateStr = formatDate(taskDate);
+            return taskDateStr >= startDate && taskDateStr <= endDate;
+          });
+        }
+
+        // Filter by selected tags if any are selected
+        if (selectedTagIds && selectedTagIds.length > 0) {
+          filteredTasks = filteredTasks.filter(task => {
+            if (!task.tagIds || task.tagIds.length === 0) return false;
+            return task.tagIds.some(tagId => selectedTagIds.includes(tagId));
+          });
+        }
+
+        // Sort tasks based on selected sort option
+        if (sortBy === 'project') {
+          filteredTasks.sort((a, b) => {
+            const projectA = projectsMap[a.projectId] || 'No Project';
+            const projectB = projectsMap[b.projectId] || 'No Project';
+            return projectA.localeCompare(projectB);
+          });
+        } else if (sortBy === 'tag') {
+          filteredTasks.sort((a, b) => {
+            const tagA = a.tagIds && a.tagIds.length > 0 ? tagsMap[a.tagIds[0]] || '' : '';
+            const tagB = b.tagIds && b.tagIds.length > 0 ? tagsMap[b.tagIds[0]] || '' : '';
+            return tagA.localeCompare(tagB);
+          });
+        } else {
+          // Default: sort by due date
+          filteredTasks.sort((a, b) => {
+            if (!a.dueOn && !b.dueOn) return 0;
+            if (!a.dueOn) return 1;
+            if (!b.dueOn) return -1;
+            return new Date(a.dueOn) - new Date(b.dueOn);
+          });
+        }
+
+        // Generate report in Markdown format
+        let reportText = `# Current Tasks Report\n\n`;
+        reportText += `**Generated:** ${new Date().toLocaleString()}  \n`;
+        reportText += `**Total Current Tasks:** ${filteredTasks.length}\n`;
+
+        if (startDate && endDate) {
+          reportText += `**Due Date Range:** ${formatDateDisplay(startDate)} - ${formatDateDisplay(endDate)}\n`;
+        }
+
+        if (selectedTagIds && selectedTagIds.length > 0) {
+          const selectedTagNames = selectedTagIds.map(id => tagsMap[id] || `Tag ${id}`).join(', ');
+          reportText += `**Filtered by Tags:** ${selectedTagNames}\n`;
+        }
+
+        reportText += `**Sort Order:** ${sortBy === 'project' ? 'Project' : sortBy === 'tag' ? 'Tag' : 'Due Date'}\n`;
+        reportText += `---\n\n`;
+
+        // Group tasks based on sort option
+        if (sortBy === 'project') {
+          // Group by project
+          const tasksByProject = {};
+          filteredTasks.forEach(task => {
+            const projectName = projectsMap[task.projectId] || 'No Project';
+            if (!tasksByProject[projectName]) {
+              tasksByProject[projectName] = [];
+            }
+            tasksByProject[projectName].push(task);
+          });
+
+          Object.keys(tasksByProject).sort().forEach(projectName => {
+            const tasks = tasksByProject[projectName];
+            reportText += `## ${projectName}\n\n`;
+            tasks.forEach(task => {
+              reportText += generateTaskReportEntry(task, tagsMap, projectsMap, 0, tasksMap);
+            });
+            reportText += `\n`;
+          });
+        } else if (sortBy === 'tag') {
+          // Group by primary tag
+          const tasksByTag = {};
+          const noTagTasks = [];
+          
+          filteredTasks.forEach(task => {
+            if (task.tagIds && task.tagIds.length > 0) {
+              const tagName = tagsMap[task.tagIds[0]] || 'Unknown Tag';
+              if (!tasksByTag[tagName]) {
+                tasksByTag[tagName] = [];
+              }
+              tasksByTag[tagName].push(task);
+            } else {
+              noTagTasks.push(task);
+            }
+          });
+
+          Object.keys(tasksByTag).sort().forEach(tagName => {
+            const tasks = tasksByTag[tagName];
+            reportText += `## ${tagName}\n\n`;
+            tasks.forEach(task => {
+              reportText += generateTaskReportEntry(task, tagsMap, projectsMap, 0, tasksMap);
+            });
+            reportText += `\n`;
+          });
+
+          if (noTagTasks.length > 0) {
+            reportText += `## No Tags\n\n`;
+            noTagTasks.forEach(task => {
+              reportText += generateTaskReportEntry(task, tagsMap, projectsMap, 0, tasksMap);
+            });
+          }
+        } else {
+          // Group by due date (default)
+          const tasksByDate = {};
+          const noDueDateTasks = [];
+
+          filteredTasks.forEach(task => {
+            if (task.dueOn) {
+              const taskDate = new Date(task.dueOn);
+              const dateStr = formatDate(taskDate);
+              if (!tasksByDate[dateStr]) {
+                tasksByDate[dateStr] = [];
+              }
+              tasksByDate[dateStr].push(task);
+            } else {
+              noDueDateTasks.push(task);
+            }
+          });
+
+          // Add tasks with due dates
+          Object.keys(tasksByDate).sort().forEach(dateStr => {
+            const tasks = tasksByDate[dateStr];
+            reportText += `## ${formatDateDisplay(dateStr)}\n\n`;
+            tasks.forEach(task => {
+              reportText += generateTaskReportEntry(task, tagsMap, projectsMap, 0, tasksMap);
+            });
+            reportText += `\n`;
+          });
+
+          // Add tasks without due dates
+          if (noDueDateTasks.length > 0) {
+            reportText += `## No Due Date\n\n`;
+            noDueDateTasks.forEach(task => {
+              reportText += generateTaskReportEntry(task, tagsMap, projectsMap, 0, tasksMap);
+            });
+          }
+        }
+
+        return reportText;
+      }
+
+      // Helper function to generate individual task report entry
+      function generateTaskReportEntry(task, tagsMap, projectsMap, indentLevel = 0, tasksMap = {}) {
+        const indent = '  '.repeat(indentLevel);
+        // Trim the task title to remove trailing spaces that break markdown formatting
+        const taskTitle = task.title.trim();
+        let reportEntry = `${indent}- **${taskTitle}**\n`;
+
+        // Add project if available and preference is enabled
+        if (preferences.currentTasksShowProject && task.projectId && projectsMap[task.projectId]) {
+          reportEntry += `${indent}  *Project:* ${projectsMap[task.projectId]}\n`;
+        }
+
+        // Add due date if available and preference is enabled
+        if (preferences.currentTasksShowDueDate && task.dueOn) {
+          const dueDate = new Date(task.dueOn);
+          reportEntry += `${indent}  *Due:* ${formatDateDisplay(formatDate(dueDate))}\n`;
+        }
+
+        // Add tags if available and preference is enabled
+        if (preferences.currentTasksShowTags && task.tagIds && task.tagIds.length > 0) {
+          const tagNames = task.tagIds.map(id => tagsMap[id] || `Tag ${id}`).join(', ');
+          reportEntry += `${indent}  *Tags:* ${tagNames}\n`;
+        }
+
+        // Add time estimate if available and preference is enabled
+        if (preferences.currentTasksShowEstimate && task.timeEstimate) {
+          const estimateMinutes = Math.round(task.timeEstimate / 60000);
+          reportEntry += `${indent}  *Estimate:* ${formatTime(estimateMinutes)}\n`;
+        }
+
+        // Add notes/description if available and preference is enabled
+        if (preferences.currentTasksShowNotes && task.notes && task.notes.trim()) {
+          const indentedNotes = task.notes.trim().split('\n').map(line => `${indent}  ${line}`).join('\n');
+          reportEntry += `${indent}  *Notes:*\n${indentedNotes}\n`;
+        }
+
+        // Add subtasks if available and preference is enabled
+        if (preferences.currentTasksShowSubtasks && task.subTaskIds && task.subTaskIds.length > 0) {
+          reportEntry += `${indent}  *Subtasks:*\n`;
+          task.subTaskIds.forEach(subTaskId => {
+            const subTask = tasksMap[subTaskId];
+            if (subTask) {
+              const checkmark = subTask.isDone ? '✓' : '○';
+              reportEntry += `${indent}    ${checkmark} ${subTask.title}\n`;
+            } else {
+              reportEntry += `${indent}    - Subtask ${subTaskId}\n`;
+            }
+          });
+        }
+
+        return reportEntry;
+      }
+
       // Generate report
       async function generateReport() {
         try {
@@ -1284,6 +1620,174 @@
         }
       }
 
+      // Show current tasks modal
+      function showCurrentTasksModal() {
+        currentTasksModal.classList.add('show');
+        // Set default dates to next 7 days
+        const today = new Date();
+        currentTasksStartDate.valueAsDate = today;
+        const sevenDaysLater = new Date(today);
+        sevenDaysLater.setDate(today.getDate() + 6);
+        currentTasksEndDate.valueAsDate = sevenDaysLater;
+      }
+
+      // Hide current tasks modal
+      function hideCurrentTasksModal() {
+        currentTasksModal.classList.remove('show');
+        currentTasksReportContent.value = '';
+      }
+
+      // Generate current tasks report
+      async function generateCurrentTasksReportAsync() {
+        try {
+          generateCurrentTasksReportBtn.disabled = true;
+          generateCurrentTasksReportBtn.textContent = 'Generating...';
+
+          const startDate = currentTasksStartDate.value;
+          const endDate = currentTasksEndDate.value;
+
+          if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+            PluginAPI.showSnack({
+              msg: 'Start date must be before or equal to end date',
+              type: 'ERROR',
+            });
+            return;
+          }
+
+          // Fetch current tasks data
+          const { currentTasks, tagsMap, projectsMap, allTags, tasksMap } = await fetchCurrentTasksData();
+
+          // Get selected tags if filtering by tags
+          let selectedTagIds = [];
+          if (filterByTagsCheckbox.checked) {
+            const tagCheckboxes = document.querySelectorAll('#tagsCheckboxContainer input[type="checkbox"]:checked');
+            selectedTagIds = Array.from(tagCheckboxes).map(cb => cb.value);
+          }
+
+          // Get sort option
+          const sortBy = sortBySelect.value;
+
+          // Generate report (this is a synchronous function that returns a string)
+          const reportText = generateCurrentTasksReport(
+            currentTasks,
+            tagsMap,
+            projectsMap,
+            startDate,
+            endDate,
+            selectedTagIds,
+            tasksMap,
+            sortBy
+          );
+
+          currentTasksReportContent.value = reportText;
+
+          // Count the actual filtered tasks in the report
+          const filteredCount = reportText.match(/^- \*\*/gm)?.length || 0;
+
+          PluginAPI.showSnack({
+            msg: `Current tasks report generated with ${filteredCount} tasks`,
+            type: 'SUCCESS',
+          });
+
+        } catch (error) {
+          console.error('Error generating current tasks report:', error);
+          PluginAPI.showSnack({
+            msg: 'Failed to generate current tasks report: ' + error.message,
+            type: 'ERROR',
+          });
+        } finally {
+          generateCurrentTasksReportBtn.disabled = false;
+          generateCurrentTasksReportBtn.textContent = 'Generate Current Tasks Report';
+        }
+      }
+
+      // Copy current tasks report to clipboard
+      async function copyCurrentTasksReport() {
+        try {
+          const text = currentTasksReportContent.value;
+          await navigator.clipboard.writeText(text);
+
+          PluginAPI.showSnack({
+            msg: 'Current tasks report copied to clipboard!',
+            type: 'SUCCESS',
+            ico: 'content_copy',
+          });
+        } catch (error) {
+          console.error('Error copying current tasks report to clipboard:', error);
+          PluginAPI.showSnack({
+            msg: 'Failed to copy current tasks report to clipboard',
+            type: 'ERROR',
+          });
+        }
+      }
+
+      // Save current tasks report
+      async function saveCurrentTasksReport() {
+        try {
+          const reportContent = currentTasksReportContent.value;
+          const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          const reportName = `Current Tasks Report - ${formatDate(new Date())} at ${currentTime}`;
+
+          const newReport = {
+            id: Date.now().toString(),
+            name: reportName,
+            content: reportContent,
+            type: 'current-tasks',
+            savedAt: new Date().toISOString()
+          };
+
+          savedReports.unshift(newReport);
+          await persistReports();
+          renderSavedReports();
+          hideCurrentTasksModal();
+
+          PluginAPI.showSnack({
+            msg: 'Current tasks report saved successfully!',
+            type: 'SUCCESS',
+            ico: 'save',
+          });
+        } catch (error) {
+          console.error('Error saving current tasks report:', error);
+          PluginAPI.showSnack({
+            msg: 'Failed to save current tasks report',
+            type: 'ERROR',
+          });
+        }
+      }
+
+      // Load tags and populate filter section
+      async function loadTagsForFilter() {
+        try {
+          const { allTags } = await fetchCurrentTasksData();
+
+          if (allTags.length === 0) {
+            tagsCheckboxContainer.innerHTML = '<div class="empty-state">No tags available</div>';
+            return;
+          }
+
+          tagsCheckboxContainer.innerHTML = allTags.map(tag => `
+            <div class="checkbox-field" style="margin: 4px 0;">
+              <input type="checkbox" id="tag-${tag.id}" value="${tag.id}" />
+              <label for="tag-${tag.id}">${tag.title}</label>
+            </div>
+          `).join('');
+
+        } catch (error) {
+          console.error('Error loading tags for filter:', error);
+          tagsCheckboxContainer.innerHTML = '<div class="error">Failed to load tags</div>';
+        }
+      }
+
+      // Toggle tags filter section visibility
+      function toggleTagsFilter() {
+        if (filterByTagsCheckbox.checked) {
+          tagsFilterSection.style.display = 'block';
+          loadTagsForFilter();
+        } else {
+          tagsFilterSection.style.display = 'none';
+        }
+      }
+
       // Load reports from storage
       async function loadReports() {
         try {
@@ -1402,22 +1906,28 @@
           return;
         }
 
-        savedReportsList.innerHTML = savedReports.map(report => `
-          <div class="saved-report-item" data-id="${report.id}">
-            <input type="checkbox" class="saved-report-checkbox" data-id="${report.id}" />
-            <div class="saved-report-info" onclick="viewReport('${report.id}')">
-              <div class="saved-report-name">${report.name}</div>
-              <div class="saved-report-meta">
-                ${formatDateDisplay(report.startDate)} - ${formatDateDisplay(report.endDate)} · 
-                ${report.totalTasks} task${report.totalTasks !== 1 ? 's' : ''} · 
-                Saved ${new Date(report.savedAt).toLocaleDateString()}
+        savedReportsList.innerHTML = savedReports.map(report => {
+          const reportTypeIcon = report.type === 'current-tasks' ? '📋' : '📊';
+          const reportTypeLabel = report.type === 'current-tasks' ? 'Current Tasks' : 'Task Completion';
+          const dateInfo = report.startDate && report.endDate
+            ? `${formatDateDisplay(report.startDate)} - ${formatDateDisplay(report.endDate)} · `
+            : '';
+
+          return `
+            <div class="saved-report-item" data-id="${report.id}">
+              <input type="checkbox" class="saved-report-checkbox" data-id="${report.id}" />
+              <div class="saved-report-info" onclick="viewReport('${report.id}')">
+                <div class="saved-report-name">${reportTypeIcon} ${report.name}</div>
+                <div class="saved-report-meta">
+                  ${dateInfo}${reportTypeLabel} · Saved ${new Date(report.savedAt).toLocaleDateString()}
+                </div>
+              </div>
+              <div class="saved-report-actions">
+                <button class="icon-btn delete-btn" onclick="deleteReport('${report.id}')" title="Delete">🗑️</button>
               </div>
             </div>
-            <div class="saved-report-actions">
-              <button class="icon-btn delete-btn" onclick="deleteReport('${report.id}')" title="Delete">🗑️</button>
-            </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
 
         // Update delete selected button visibility
         updateDeleteSelectedButton();
@@ -1586,6 +2096,14 @@
       cancelPreferencesBtn.addEventListener('click', cancelPreferences);
       savePreferencesBtn.addEventListener('click', savePreferences);
 
+      // Current tasks event listeners
+      generateCurrentTasksBtn.addEventListener('click', showCurrentTasksModal);
+      closeCurrentTasksModalBtn.addEventListener('click', hideCurrentTasksModal);
+      generateCurrentTasksReportBtn.addEventListener('click', generateCurrentTasksReportAsync);
+      currentTasksCopyBtn.addEventListener('click', copyCurrentTasksReport);
+      currentTasksSaveBtn.addEventListener('click', saveCurrentTasksReport);
+      filterByTagsCheckbox.addEventListener('change', toggleTagsFilter);
+
       // Handle groupBy change to show/hide appropriate checkboxes
       groupBySelect.addEventListener('change', updateGroupByVisibility);
 
@@ -1602,6 +2120,12 @@
         }
       });
 
+      currentTasksModal.addEventListener('click', (e) => {
+        if (e.target === currentTasksModal) {
+          hideCurrentTasksModal();
+        }
+      });
+
       // Close modal on Escape key
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -1609,6 +2133,8 @@
             hideReportModal();
           } else if (preferencesModal.classList.contains('show')) {
             hidePreferencesModal();
+          } else if (currentTasksModal.classList.contains('show')) {
+            hideCurrentTasksModal();
           }
         }
       });
