@@ -34,10 +34,62 @@ A plugin for [Super Productivity](https://super-productivity.com) that generates
 - 🎛️ **Customizable Display** - Control what information is shown in current tasks reports
 - 💾 **Save Current Tasks Reports** - Save current tasks reports for future reference
 - 📊 **Distinguished Report Types** - Current tasks reports are clearly marked with 📋 icon
+--- 
+## UPDATE TO ORIGINAL
+
+This is a forked version of the [original sp-reporter plugin](https://github.com/dougcooper/sp-reporter) with significant enhancements to the Current Tasks feature:
+
+### Key Differences from Original
+
+#### 1. **Subtask Display Enhancement**
+- **This Fork**: Subtasks display with readable titles and completion status:
+  - ✓ for completed subtasks
+  - ○ for incomplete subtasks
+  - Example: `✓ Order xyz from supplier`
+
+#### 2. **Subtask Filtering**
+- **This Fork**: Subtasks are filtered out from the main task list and only appear nested under their parent tasks
+
+#### 3. **Sorting Options**
+- **This Fork**: Three sorting options available:
+  - **Due Date** (default): Groups tasks by due date
+  - **Project**: Groups tasks by project name
+  - **Tag**: Groups tasks by primary tag
+  - Sort order is clearly indicated in the report header
+
+#### 4. **Markdown Formatting Fix**
+- **This Fork**: All task titles are trimmed to ensure proper markdown formatting
+
+#### 5. **Forked Report Output**
+The Current Tasks report now includes:
+- Clear grouping headers based on sort selection
+- Proper nesting of subtasks with visual indicators
+- Clean markdown formatting throughout
+- Sort order displayed in report metadata
+
+### Example Output for Current Task Report 
+```markdown
+- **Missing signage order**
+  *Project:* Store 1
+  *Tags:* kanban, TODO
+  *Subtasks:*
+    ✓ How many aisle headers are needed?
+    ✓ How many aisle direction signs are needed?
+    ○ Ensure payment is made
+```
+
+### Usage Changes
+
+When generating a Current Tasks report, you'll now see:
+1. A **"Sort by"** dropdown with three options (Due Date, Project, Tag)
+2. Subtasks displayed with meaningful titles and completion indicators
+3. No duplicate tasks in the output
+4. Properly formatted markdown throughout
+--- 
 
 ## Installation
 
-1. Download the plugin files for the latest [Release](https://github.com/dougcooper/sp-reporter/releases)
+1. Download the plugin files for the latest [Release](https://github.com/jatwell93/sp-reporter)
 2. Open Super Productivity
 3. Go to Settings → Plugins
 4. Click "Load Plugin from Folder"
