@@ -37,7 +37,7 @@ A plugin for [Super Productivity](https://super-productivity.com) that generates
 --- 
 ## UPDATE TO ORIGINAL
 
-This is a forked version of the [original sp-reporter plugin](https://github.com/dougcooper/sp-reporter) with significant enhancements to the Current Tasks feature:
+This is a forked version of the [original sp-reporter plugin](https://github.com/dougcooper/sp-reporter) adding a Current Tasks feature:
 
 ### Key Differences from Original
 
